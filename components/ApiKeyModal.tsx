@@ -76,9 +76,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
           {validationError && (
             <div className="mb-6 bg-red-900/20 border border-red-500/50 p-4 rounded flex gap-3 items-start">
                 <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <div>
+                <div className="w-full">
                     <h4 className="text-red-500 font-bold font-mono text-sm mb-1">VALIDATION FAILED</h4>
-                    <p className="text-gray-400 text-xs leading-relaxed">
+                    <p className="text-gray-400 text-xs leading-relaxed break-words whitespace-pre-wrap">
                         {validationError}
                     </p>
                 </div>

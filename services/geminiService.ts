@@ -32,18 +32,19 @@ export const checkModelAvailability = async (apiKey: string): Promise<string> =>
   const ai = new GoogleGenAI({ apiKey });
   
   // UPDATED PRIORITY: 
-  // 1. Gemini 2.0 Flash (Exp) - Highest speed, best quota/free-tier limits, very capable.
-  // 2. Gemini 1.5 Flash - Most stable production model.
-  // 3. Gemini 3.0 Pro - Highest capability but very strict quota (often fails on Vercel free tier).
+  // Added 1.5 Flash 8B as extreme fallback and increased robustness
   const models = [
     { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
     { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B' },
     { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' }
   ];
 
+  const errors: string[] = [];
+
   for (const model of models) {
     try {
-      // Small ping to check quota/availability with timeout
+      // Increased timeout to 10s to handle Vercel cold starts / edge latency
       const checkPromise = ai.models.generateContent({
         model: model.id,
         contents: 'ping',
@@ -51,18 +52,34 @@ export const checkModelAvailability = async (apiKey: string): Promise<string> =>
       });
 
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout")), 5000)
+        setTimeout(() => reject(new Error(`Timeout connecting to ${model.id}`)), 10000)
       );
 
       await Promise.race([checkPromise, timeoutPromise]);
       return model.id;
     } catch (e: any) {
        console.warn(`Model ${model.id} failed check:`, e.message);
-       // Continue to next model
+       errors.push(e.message || "Unknown error");
     }
   }
 
-  throw new Error("Unable to establish connection with any supported Gemini model. Your API key may be invalid or quota exceeded.");
+  // Diagnostic Error Analysis for User Feedback
+  const joinedErrors = errors.join(' ');
+  
+  // Check for common API Key restrictions
+  if (joinedErrors.includes("403") || joinedErrors.includes("check your API key")) {
+      throw new Error("Access Denied (403). If using Vercel, check if your API Key in Google Cloud Console has 'Referrer' restrictions. You may need to add your Vercel domain.");
+  }
+  
+  if (joinedErrors.includes("429") || joinedErrors.includes("quota")) {
+      throw new Error("Quota Exceeded (429). Your API key has exhausted its free tier limits on all available models.");
+  }
+
+  if (joinedErrors.includes("Timeout")) {
+      throw new Error("Network Timeout. Connection to Google AI blocked or too slow.");
+  }
+
+  throw new Error(`Connection Failed. Google AI refused connection. (Last error: ${errors[0]})`);
 };
 
 export const streamOsintData = async (
@@ -106,7 +123,6 @@ export const streamOsintData = async (
   `;
 
   try {
-    // Use the dynamic modelId passed from the app state
     const responseStream = await ai.models.generateContentStream({
       model: modelId, 
       contents: prompt,
@@ -125,22 +141,24 @@ export const streamOsintData = async (
     }
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error(`Error on model ${modelId}:`, error);
     
-    // AUTO-DOWNGRADE LOGIC
-    // If we hit a quota limit (429) or overload (503) on a Pro model, try to fallback to Flash automatically.
     const isQuotaError = error.message?.includes("429") || error.message?.includes("quota") || error.status === 429;
-    const isProModel = modelId.includes('pro');
+    const isOverload = error.message?.includes("503") || error.message?.includes("overloaded");
+    
+    // Fallback Chain Logic
+    if (isQuotaError || isOverload) {
+        let backupModel = '';
+        
+        if (modelId === 'gemini-3-pro-preview') backupModel = 'gemini-2.0-flash-exp';
+        else if (modelId === 'gemini-2.0-flash-exp') backupModel = 'gemini-1.5-flash';
+        else if (modelId === 'gemini-1.5-flash') backupModel = 'gemini-1.5-flash-8b';
 
-    if (isQuotaError && isProModel) {
-        const backupModel = 'gemini-2.0-flash-exp';
-        console.warn(`Quota exceeded on ${modelId}. Rerouting to ${backupModel}...`);
-        
-        // Notify user via the stream
-        onUpdate(`\n\n> **[SYSTEM ALERT]:** PRIMARY UPLINK (${modelId.toUpperCase()}) SATURATED.\n> **[ACTION]:** REROUTING TRAFFIC TO HIGH-SPEED BACKUP NODE (${backupModel.toUpperCase()})...\n\n---\n\n`);
-        
-        // Recursively try with the backup model
-        return streamOsintData(target, type, additionalInfo, onUpdate, apiKey, backupModel);
+        if (backupModel) {
+            console.warn(`Rerouting from ${modelId} to ${backupModel}...`);
+            onUpdate(`\n\n> **[SYSTEM ALERT]:** UPLINK ${modelId.toUpperCase()} UNSTABLE (ERROR ${isQuotaError ? '429' : '503'}).\n> **[ACTION]:** REROUTING TO ${backupModel.toUpperCase()}...\n\n---\n\n`);
+            return streamOsintData(target, type, additionalInfo, onUpdate, apiKey, backupModel);
+        }
     }
 
     throw error;
