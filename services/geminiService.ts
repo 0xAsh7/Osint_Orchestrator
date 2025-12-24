@@ -2,7 +2,7 @@ import { TargetType } from "../types";
 
 // FREE MODELS CONFIGURATION
 export const FREE_MODELS = [
-    { id: 'google/gemini-2.0-flash-lite-preview-02-05:free', name: 'Gemini 2.0 Flash Lite (Free)' },
+    { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp (Free)' },
     { id: 'xiaomi/mimo-v2-flash:free', name: 'Xiaomi Mimo V2 Flash (Free)' },
     { id: 'mistralai/devstral-2512:free', name: 'Mistral Devstral 2512 (Free)' },
     { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1-T2 Chimera (Free)' },
@@ -38,6 +38,10 @@ OUTPUT RULES:
 export const checkModelAvailability = async (apiKey: string, modelId: string): Promise<string> => {
   if (!apiKey) throw new Error("API Key is required");
 
+  // Add timeout to prevent UI hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -51,16 +55,23 @@ export const checkModelAvailability = async (apiKey: string, modelId: string): P
         model: modelId,
         messages: [{ role: "user", content: "ping" }],
         max_tokens: 1
-      })
+      }),
+      signal: controller.signal
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error?.message || `Status ${response.status}`);
     }
 
     return modelId;
   } catch (e: any) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') {
+        throw new Error("Connection Timeout (10s). OpenRouter is slow.");
+    }
     throw new Error(`Connection Failed: ${e.message}`);
   }
 };
@@ -71,7 +82,7 @@ export const streamOsintData = async (
     additionalInfo: string, 
     onUpdate: (chunk: string) => void,
     customApiKey?: string,
-    modelId: string = 'google/gemini-2.0-flash-lite-preview-02-05:free'
+    modelId: string = 'google/gemini-2.0-flash-exp:free'
 ): Promise<void> => {
   // Priority: 
   // 1. Custom Key entered in UI

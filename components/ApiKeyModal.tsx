@@ -20,6 +20,16 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
   const [validationError, setValidationError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
 
+  // Effect to reset internal state when modal re-opens (sanity check, though unmount usually handles this)
+  useEffect(() => {
+    if (isOpen) {
+        setValidationError(null);
+        setConnectionSuccess(false);
+        setIsValidating(false);
+        setKey(initialValue);
+    }
+  }, [isOpen, initialValue]);
+
   const handleValidation = async () => {
     setIsValidating(true);
     setValidationError(null);
@@ -35,6 +45,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
         
         // Slight delay to show the success state before auto-saving/closing
         setTimeout(() => {
+            setIsValidating(false); // Explicitly clear loading state
             onSave(key, shouldSave, selectedModel);
         }, 1500);
 
