@@ -20,22 +20,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
   const [validationError, setValidationError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
 
-  // If initial value provided, use it. If empty, check if we have a default env var to show visually?
-  // No, for security we don't show the env var in the input, but we treat empty input as "use default" if user clicks connect.
-
   const handleValidation = async () => {
-    // If key is empty, we might be trying to use the default env key.
-    // However, for validation, we need to know if one exists.
-    // We pass the key to the service. If it's empty, service checks env.
-    
     setIsValidating(true);
     setValidationError(null);
     setConnectionSuccess(false);
 
     try {
-        // Prefer input key, otherwise fallback will be handled by service or fail
-        // Fix: use process.env instead of import.meta.env
-        const keyToTest = key || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY || "";
+        // Prefer input key, otherwise fallback will be handled by service
+        // We assume env vars are present if input is empty
+        const keyToTest = key || process.env.API_KEY || "";
         
         await checkModelAvailability(keyToTest, selectedModel);
         setConnectionSuccess(true);

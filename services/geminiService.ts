@@ -73,12 +73,13 @@ export const streamOsintData = async (
     customApiKey?: string,
     modelId: string = 'google/gemini-2.0-flash-lite-preview-02-05:free'
 ): Promise<void> => {
-  // Prefer Vite env var, then generic env var, then custom key
-  // Fix: use process.env instead of import.meta.env
-  const apiKey = customApiKey || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY;
+  // Priority: 
+  // 1. Custom Key entered in UI
+  // 2. API_KEY (Bridged via vite.config.ts define)
+  const apiKey = customApiKey || process.env.API_KEY;
     
   if (!apiKey) {
-      throw new Error("No OpenRouter API Key Found. Please set a Custom API Key.");
+      throw new Error("No API Key Found. Please set a Custom API Key or configure API_KEY.");
   }
 
   const timestamp = new Date().toISOString();

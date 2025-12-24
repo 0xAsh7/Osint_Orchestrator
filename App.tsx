@@ -40,8 +40,7 @@ const App: React.FC = () => {
     const storedModel = localStorage.getItem(STORAGE_MODEL_KEY);
     
     // Check if we have a default environment key
-    // Fix: use process.env instead of import.meta.env
-    const hasDefaultKey = process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY;
+    const hasDefaultKey = process.env.API_KEY;
 
     if (storedKey) {
         setCustomApiKey(storedKey);
@@ -183,8 +182,7 @@ const App: React.FC = () => {
         localStorage.setItem(STORAGE_MODEL_KEY, modelId);
     }
 
-    // Fix: use process.env instead of import.meta.env
-    if (key || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY) {
+    if (key || process.env.API_KEY) {
          addLog(`Secure Uplink Established. Model: ${modelId}.`, 'success');
     }
 
@@ -207,8 +205,7 @@ const App: React.FC = () => {
   };
 
   // Check if we have an active key source (Env or Custom)
-  // Fix: use process.env instead of import.meta.env
-  const hasActiveKey = !!(customApiKey || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY);
+  const hasActiveKey = !!(customApiKey || process.env.API_KEY);
 
   return (
     <div className="min-h-screen bg-black text-gray-200 font-sans selection:bg-osint-green selection:text-black flex flex-col overflow-x-hidden">
