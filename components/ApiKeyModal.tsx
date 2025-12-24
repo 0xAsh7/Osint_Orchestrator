@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Key, X, ExternalLink, ShieldAlert, Save, Loader2, CheckCircle2, Server } from 'lucide-react';
-import { checkModelAvailability } from '../services/geminiService';
+import React, { useState, useEffect } from 'react';
+import { Key, X, ExternalLink, ShieldAlert, Save, Loader2, CheckCircle2, Server, ChevronDown } from 'lucide-react';
+import { checkModelAvailability, FREE_MODELS } from '../services/geminiService';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -13,26 +13,36 @@ interface ApiKeyModalProps {
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, initialValue = '', isErrorMode = false }) => {
   const [key, setKey] = useState(initialValue);
   const [shouldSave, setShouldSave] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(FREE_MODELS[0].id);
   
   // Validation State
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [detectedModel, setDetectedModel] = useState<string | null>(null);
+  const [connectionSuccess, setConnectionSuccess] = useState(false);
+
+  // If initial value provided, use it. If empty, check if we have a default env var to show visually?
+  // No, for security we don't show the env var in the input, but we treat empty input as "use default" if user clicks connect.
 
   const handleValidation = async () => {
-    if (!key) return;
-
+    // If key is empty, we might be trying to use the default env key.
+    // However, for validation, we need to know if one exists.
+    // We pass the key to the service. If it's empty, service checks env.
+    
     setIsValidating(true);
     setValidationError(null);
-    setDetectedModel(null);
+    setConnectionSuccess(false);
 
     try {
-        const modelId = await checkModelAvailability(key);
-        setDetectedModel(modelId);
+        // Prefer input key, otherwise fallback will be handled by service or fail
+        // Fix: use process.env instead of import.meta.env
+        const keyToTest = key || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY || "";
+        
+        await checkModelAvailability(keyToTest, selectedModel);
+        setConnectionSuccess(true);
         
         // Slight delay to show the success state before auto-saving/closing
         setTimeout(() => {
-            onSave(key, shouldSave, modelId);
+            onSave(key, shouldSave, selectedModel);
         }, 1500);
 
     } catch (err: any) {
@@ -53,9 +63,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
           <div className="flex items-center justify-between mb-6">
              <div className="flex items-center gap-2 text-osint-green font-mono font-bold text-lg">
                 <Key className="w-5 h-5" />
-                <span>API CONFIGURATION</span>
+                <span>OPENROUTER CONFIG</span>
              </div>
-             {/* Always allow closing, even during validation, to prevent getting stuck */}
              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
              </button>
@@ -67,7 +76,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                 <div>
                     <h4 className="text-red-500 font-bold font-mono text-sm mb-1">CONNECTION FAILURE</h4>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                        The default system uplink is overloaded or unresponsive. You must manually override with your own Neural Uplink (API Key).
+                        The current uplink is unresponsive. Please verify your OpenRouter Key or select a different model.
                     </p>
                 </div>
             </div>
@@ -86,30 +95,52 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
           )}
 
           <div className="space-y-4">
+             {/* Model Selection */}
             <div>
                 <label className="block text-xs font-mono text-osint-dim mb-2 uppercase tracking-wider">
-                    Google Gemini API Key
+                    Target Model (Free Tier)
+                </label>
+                <div className="relative">
+                    <select 
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-xs md:text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green appearance-none cursor-pointer"
+                    >
+                        {FREE_MODELS.map(model => (
+                            <option key={model.id} value={model.id}>
+                                {model.name}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                </div>
+            </div>
+
+            {/* API Key Input */}
+            <div>
+                <label className="block text-xs font-mono text-osint-dim mb-2 uppercase tracking-wider flex justify-between">
+                    <span>OpenRouter API Key</span>
+                    <span className="text-gray-500 text-[10px]">Leave empty to use default</span>
                 </label>
                 <input 
                     type="password" 
                     value={key}
                     onChange={(e) => {
                         setKey(e.target.value);
-                        setValidationError(null); // Clear error on typing
+                        setValidationError(null); 
                     }}
                     disabled={isValidating}
-                    placeholder="AIzaSy..."
+                    placeholder="sk-or-..."
                     className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green transition-all placeholder-gray-600 disabled:opacity-50"
                 />
             </div>
 
             <div className="bg-gray-900/50 rounded p-4 border border-gray-800">
-                <h4 className="text-gray-300 font-mono text-xs font-bold mb-2">HOW TO GENERATE A KEY:</h4>
+                <h4 className="text-gray-300 font-mono text-xs font-bold mb-2">HOW TO GET A KEY:</h4>
                 <ol className="text-gray-500 text-xs space-y-2 list-decimal list-inside font-mono">
-                    <li>Access the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-osint-dim hover:text-osint-green underline inline-flex items-center gap-1">Google AI Studio <ExternalLink className="w-3 h-3"/></a> console.</li>
-                    <li>Sign in with your Google Account.</li>
-                    <li>Click <strong>"Create API Key"</strong>.</li>
-                    <li>Copy the string starting with <code>AIza</code> and paste it above.</li>
+                    <li>Go to <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-osint-dim hover:text-osint-green underline inline-flex items-center gap-1">OpenRouter.ai <ExternalLink className="w-3 h-3"/></a>.</li>
+                    <li>Create a key (no credit card required for free models).</li>
+                    <li>Paste the key above.</li>
                 </ol>
             </div>
 
@@ -129,46 +160,37 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                     </div>
                 </div>
                 <label htmlFor="save-key" className="cursor-pointer select-none text-xs font-mono text-gray-400 hover:text-gray-300">
-                    Save Key to Browser Storage (Cookies)
+                    Save Key to Browser Storage
                 </label>
             </div>
 
             <button 
                 onClick={handleValidation}
-                disabled={!key || isValidating}
+                disabled={isValidating}
                 className={`
                     w-full font-mono font-bold py-3 rounded transition-all uppercase tracking-widest mt-2 flex items-center justify-center gap-2
-                    ${key && !isValidating
-                        ? 'bg-osint-green text-black hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.6)]' 
-                        : 'bg-gray-800 text-gray-500 cursor-not-allowed'}
+                    ${isValidating 
+                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        : 'bg-osint-green text-black hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.6)]'}
                 `}
             >
                 {isValidating ? (
                     <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        CHECKING AVAILABILITY...
+                        CHECKING ROUTE...
                     </>
-                ) : detectedModel ? (
+                ) : connectionSuccess ? (
                     <>
                         <CheckCircle2 className="w-4 h-4" />
-                        UPLINK SECURE ({detectedModel.replace('gemini-', '')})
+                        UPLINK SECURE
                     </>
                 ) : (
                     <>
                          {shouldSave ? <Save className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                         {key ? 'ESTABLISH UPLINK' : 'ENTER KEY'}
+                         {key ? 'CONNECT CUSTOM KEY' : 'CONNECT (DEFAULT)'}
                     </>
                 )}
             </button>
-            
-            {detectedModel && (
-                 <div className="text-center text-[10px] font-mono text-osint-green animate-pulse">
-                    <div className="flex items-center justify-center gap-1">
-                        <Server className="w-3 h-3" />
-                        <span>OPTIMIZED ROUTE: {detectedModel.toUpperCase()}</span>
-                    </div>
-                 </div>
-            )}
           </div>
         </div>
       </div>

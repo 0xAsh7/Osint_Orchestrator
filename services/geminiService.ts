@@ -1,5 +1,14 @@
-import { GoogleGenAI } from "@google/genai";
 import { TargetType } from "../types";
+
+// FREE MODELS CONFIGURATION
+export const FREE_MODELS = [
+    { id: 'google/gemini-2.0-flash-lite-preview-02-05:free', name: 'Gemini 2.0 Flash Lite (Free)' },
+    { id: 'xiaomi/mimo-v2-flash:free', name: 'Xiaomi Mimo V2 Flash (Free)' },
+    { id: 'mistralai/devstral-2512:free', name: 'Mistral Devstral 2512 (Free)' },
+    { id: 'tngtech/deepseek-r1t2-chimera:free', name: 'DeepSeek R1-T2 Chimera (Free)' },
+    { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B Instruct (Free)' },
+    { id: 'microsoft/phi-3-mini-128k-instruct:free', name: 'Phi-3 Mini (Free)' },
+];
 
 const SYSTEM_PROMPT = `
 ROLE: You are the Universal OSINT Orchestrator.
@@ -26,60 +35,34 @@ OUTPUT RULES:
 - **IMPORTANT**: Do NOT wrap the output in a markdown code block (e.g., \`\`\`markdown). Return RAW markdown text only.
 `;
 
-export const checkModelAvailability = async (apiKey: string): Promise<string> => {
+export const checkModelAvailability = async (apiKey: string, modelId: string): Promise<string> => {
   if (!apiKey) throw new Error("API Key is required");
-  
-  const ai = new GoogleGenAI({ apiKey });
-  
-  // UPDATED PRIORITY: 
-  // Added 1.5 Flash 8B as extreme fallback and increased robustness
-  const models = [
-    { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash-8B' },
-    { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' }
-  ];
 
-  const errors: string[] = [];
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": window.location.href,
+        "X-Title": "Universal OSINT Orchestrator",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1
+      })
+    });
 
-  for (const model of models) {
-    try {
-      // Increased timeout to 10s to handle Vercel cold starts / edge latency
-      const checkPromise = ai.models.generateContent({
-        model: model.id,
-        contents: 'ping',
-        config: { maxOutputTokens: 1 }
-      });
-
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`Timeout connecting to ${model.id}`)), 10000)
-      );
-
-      await Promise.race([checkPromise, timeoutPromise]);
-      return model.id;
-    } catch (e: any) {
-       console.warn(`Model ${model.id} failed check:`, e.message);
-       errors.push(e.message || "Unknown error");
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || `Status ${response.status}`);
     }
-  }
 
-  // Diagnostic Error Analysis for User Feedback
-  const joinedErrors = errors.join(' ');
-  
-  // Check for common API Key restrictions
-  if (joinedErrors.includes("403") || joinedErrors.includes("check your API key")) {
-      throw new Error("Access Denied (403). If using Vercel, check if your API Key in Google Cloud Console has 'Referrer' restrictions. You may need to add your Vercel domain.");
+    return modelId;
+  } catch (e: any) {
+    throw new Error(`Connection Failed: ${e.message}`);
   }
-  
-  if (joinedErrors.includes("429") || joinedErrors.includes("quota")) {
-      throw new Error("Quota Exceeded (429). Your API key has exhausted its free tier limits on all available models.");
-  }
-
-  if (joinedErrors.includes("Timeout")) {
-      throw new Error("Network Timeout. Connection to Google AI blocked or too slow.");
-  }
-
-  throw new Error(`Connection Failed. Google AI refused connection. (Last error: ${errors[0]})`);
 };
 
 export const streamOsintData = async (
@@ -88,15 +71,16 @@ export const streamOsintData = async (
     additionalInfo: string, 
     onUpdate: (chunk: string) => void,
     customApiKey?: string,
-    modelId: string = 'gemini-2.0-flash-exp'
+    modelId: string = 'google/gemini-2.0-flash-lite-preview-02-05:free'
 ): Promise<void> => {
-  const apiKey = customApiKey || process.env.API_KEY;
+  // Prefer Vite env var, then generic env var, then custom key
+  // Fix: use process.env instead of import.meta.env
+  const apiKey = customApiKey || process.env.VITE_OPENROUTER_API_KEY || process.env.API_KEY;
     
   if (!apiKey) {
-      throw new Error("No API Configuration Found. Please set a Custom API Key.");
+      throw new Error("No OpenRouter API Key Found. Please set a Custom API Key.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
   const timestamp = new Date().toISOString();
   
   let contextPrompt = "";
@@ -104,7 +88,7 @@ export const streamOsintData = async (
       contextPrompt = `\nADDITIONAL CONTEXT PROVIDED BY INTELLIGENCE OFFICER:\n"${additionalInfo}"\nUse this context to filter false positives and find the correct individual.\n`;
   }
 
-  const prompt = `
+  const userPrompt = `
     TARGET: "${target}"
     DETECTED TYPE: ${type}
     TIMESTAMP: ${timestamp}
@@ -123,44 +107,60 @@ export const streamOsintData = async (
   `;
 
   try {
-    const responseStream = await ai.models.generateContentStream({
-      model: modelId, 
-      contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        tools: [{ googleSearch: {} }],
-        temperature: 0, 
-      }
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "HTTP-Referer": window.location.href,
+            "X-Title": "Universal OSINT Orchestrator",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            model: modelId,
+            messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: userPrompt }
+            ],
+            stream: true
+        })
     });
 
-    for await (const chunk of responseStream) {
-        const text = chunk.text;
-        if (text) {
-            onUpdate(text);
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `OpenRouter API Error: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder("utf-8");
+
+    if (!reader) throw new Error("Response body is null");
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter(line => line.trim() !== "");
+
+        for (const line of lines) {
+            if (line.includes("[DONE]")) return;
+            
+            if (line.startsWith("data: ")) {
+                try {
+                    const json = JSON.parse(line.replace("data: ", ""));
+                    const content = json.choices[0]?.delta?.content;
+                    if (content) {
+                        onUpdate(content);
+                    }
+                } catch (e) {
+                    console.warn("Error parsing chunk", e);
+                }
+            }
         }
     }
 
   } catch (error: any) {
-    console.error(`Error on model ${modelId}:`, error);
-    
-    const isQuotaError = error.message?.includes("429") || error.message?.includes("quota") || error.status === 429;
-    const isOverload = error.message?.includes("503") || error.message?.includes("overloaded");
-    
-    // Fallback Chain Logic
-    if (isQuotaError || isOverload) {
-        let backupModel = '';
-        
-        if (modelId === 'gemini-3-pro-preview') backupModel = 'gemini-2.0-flash-exp';
-        else if (modelId === 'gemini-2.0-flash-exp') backupModel = 'gemini-1.5-flash';
-        else if (modelId === 'gemini-1.5-flash') backupModel = 'gemini-1.5-flash-8b';
-
-        if (backupModel) {
-            console.warn(`Rerouting from ${modelId} to ${backupModel}...`);
-            onUpdate(`\n\n> **[SYSTEM ALERT]:** UPLINK ${modelId.toUpperCase()} UNSTABLE (ERROR ${isQuotaError ? '429' : '503'}).\n> **[ACTION]:** REROUTING TO ${backupModel.toUpperCase()}...\n\n---\n\n`);
-            return streamOsintData(target, type, additionalInfo, onUpdate, apiKey, backupModel);
-        }
-    }
-
+    console.error("OpenRouter API Error:", error);
     throw error;
   }
 };
