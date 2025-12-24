@@ -6,9 +6,10 @@ import { ResultViewer } from './components/ResultViewer';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { DisclaimerOverlay } from './components/DisclaimerOverlay';
 import { streamOsintData } from './services/geminiService';
-import { Shield, Activity, Database, Key, AlertTriangle } from 'lucide-react';
+import { Shield, Activity, Database, Key, AlertTriangle, Cpu } from 'lucide-react';
 
 const STORAGE_KEY = 'osint_gemini_api_key';
+const STORAGE_MODEL_KEY = 'osint_gemini_model_id';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -24,19 +25,25 @@ const App: React.FC = () => {
   const [lastInfo, setLastInfo] = useState<string>('');
   const [expandInput, setExpandInput] = useState(false);
 
-  // API Key Management
+  // API Key & Model Management
   const [customApiKey, setCustomApiKey] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3-pro-preview');
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isErrorMode, setIsErrorMode] = useState(false);
 
   // Refs for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Initialize: Check for stored API Key
+  // Initialize: Check for stored API Key and Model
   useEffect(() => {
     const storedKey = localStorage.getItem(STORAGE_KEY);
+    const storedModel = localStorage.getItem(STORAGE_MODEL_KEY);
+    
     if (storedKey) {
         setCustomApiKey(storedKey);
+        if (storedModel) {
+            setSelectedModel(storedModel);
+        }
     } else {
         // If no key is saved, prompt the user immediately
         setIsKeyModalOpen(true);
@@ -112,7 +119,8 @@ const App: React.FC = () => {
                 streamBuffer += chunk;
                 setResult({ reportMarkdown: streamBuffer });
             },
-            customApiKey
+            customApiKey,
+            selectedModel // Pass the detected/selected model
         );
         
         // Ensure logs finish before showing complete? 
@@ -130,7 +138,7 @@ const App: React.FC = () => {
         addLog(errMsg, 'error');
         setAppState(AppState.ERROR);
         
-        if (errMsg.includes("API Key") || errMsg.includes("Key")) {
+        if (errMsg.includes("API Key") || errMsg.includes("Key") || errMsg.includes("quota")) {
              setIsErrorMode(true);
              setIsKeyModalOpen(true);
         }
@@ -149,7 +157,7 @@ const App: React.FC = () => {
     if (lastInfo) addLog(`Injecting context parameters...`, 'info');
     
     await delay(1500);
-    addLog(`Constructing prompt for 'gemini-3-pro-preview'...`, 'system');
+    addLog(`Constructing prompt for '${selectedModel}'...`, 'system');
     await delay(2000);
     
     addLog(`Dispatching payload to Google Cloud Vertex AI...`, 'warning');
@@ -175,15 +183,18 @@ const App: React.FC = () => {
     // The loop ends, usually the stream starts right after this.
   };
 
-  const handleSaveKey = (key: string, shouldSave: boolean) => {
+  const handleSaveKey = (key: string, shouldSave: boolean, modelId: string) => {
     setCustomApiKey(key);
+    setSelectedModel(modelId);
     
     if (shouldSave && key) {
         localStorage.setItem(STORAGE_KEY, key);
-        addLog('Secure Uplink Established. Key Saved to Local Storage.', 'success');
+        localStorage.setItem(STORAGE_MODEL_KEY, modelId);
+        addLog(`Secure Uplink Established. Model: ${modelId}. Key Saved.`, 'success');
     } else {
         localStorage.removeItem(STORAGE_KEY);
-        if (key) addLog('Secure Uplink Established (Session Only).', 'success');
+        localStorage.removeItem(STORAGE_MODEL_KEY);
+        if (key) addLog(`Secure Uplink Established (Session Only). Model: ${modelId}.`, 'success');
     }
 
     setIsKeyModalOpen(false);
@@ -228,6 +239,13 @@ const App: React.FC = () => {
                     <Activity className={`w-3 h-3 ${appState === AppState.ANALYZING || appState === AppState.GENERATING ? 'text-osint-green animate-pulse' : ''}`} />
                     <span>SYSTEM: {appState === AppState.IDLE ? 'READY' : 'BUSY'}</span>
                 </div>
+                
+                {/* Detected Model Indicator */}
+                <div className="hidden lg:flex items-center gap-2">
+                    <Cpu className="w-3 h-3 text-osint-dim" />
+                    <span>MODEL: <span className="text-gray-300">{selectedModel.replace('gemini-', '').replace('-preview', '')}</span></span>
+                </div>
+
                 <div className="hidden lg:flex items-center gap-2">
                     <Database className="w-3 h-3" />
                     <span>LIVE CONNECT</span>
@@ -332,6 +350,9 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4">
             <p className="text-gray-600 text-[10px] md:text-xs font-mono text-center md:text-left">
                 UNIVERSAL OSINT ORCHESTRATOR // EDUCATIONAL PURPOSES ONLY
+            </p>
+            <p className="text-gray-700 text-[10px] md:text-xs font-mono text-center md:text-right uppercase">
+                Made By Ashish Sangar
             </p>
         </div>
       </footer>

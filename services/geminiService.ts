@@ -26,12 +26,50 @@ OUTPUT RULES:
 - **IMPORTANT**: Do NOT wrap the output in a markdown code block (e.g., \`\`\`markdown). Return RAW markdown text only.
 `;
 
+export const checkModelAvailability = async (apiKey: string): Promise<string> => {
+  if (!apiKey) throw new Error("API Key is required");
+  
+  const ai = new GoogleGenAI({ apiKey });
+  
+  // Define models to try in order of preference for OSINT tasks
+  // Pro is better for reasoning, Flash is faster/cheaper/higher quota
+  const models = [
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
+    { id: 'gemini-flash-latest', name: 'Gemini Flash 2.0' } // Fallback to stable latest
+  ];
+
+  for (const model of models) {
+    try {
+      // Small ping to check quota/availability with timeout
+      const checkPromise = ai.models.generateContent({
+        model: model.id,
+        contents: 'ping',
+        config: { maxOutputTokens: 1 }
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 5000)
+      );
+
+      await Promise.race([checkPromise, timeoutPromise]);
+      return model.id;
+    } catch (e: any) {
+       console.warn(`Model ${model.id} failed check:`, e.message);
+       // Continue to next model
+    }
+  }
+
+  throw new Error("Unable to establish connection with any supported Gemini model. Your API key may be invalid or quota exceeded.");
+};
+
 export const streamOsintData = async (
     target: string, 
     type: TargetType, 
     additionalInfo: string, 
     onUpdate: (chunk: string) => void,
-    customApiKey?: string
+    customApiKey?: string,
+    modelId: string = 'gemini-3-pro-preview'
 ): Promise<void> => {
   try {
     const apiKey = customApiKey || process.env.API_KEY;
@@ -66,9 +104,9 @@ export const streamOsintData = async (
       Begin streaming the Markdown report immediately.
     `;
 
-    // Switch to gemini-3-pro-preview for maximum reasoning capability and detail
+    // Use the dynamic modelId passed from the app state
     const responseStream = await ai.models.generateContentStream({
-      model: 'gemini-3-pro-preview', 
+      model: modelId, 
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_PROMPT,

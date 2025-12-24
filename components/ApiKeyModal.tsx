@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Key, X, ExternalLink, ShieldAlert, Save } from 'lucide-react';
+import { Key, X, ExternalLink, ShieldAlert, Save, Loader2, CheckCircle2, Server } from 'lucide-react';
+import { checkModelAvailability } from '../services/geminiService';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (key: string, shouldSave: boolean) => void;
+  onSave: (key: string, shouldSave: boolean, modelId: string) => void;
   initialValue?: string;
   isErrorMode?: boolean;
 }
@@ -12,6 +13,33 @@ interface ApiKeyModalProps {
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, initialValue = '', isErrorMode = false }) => {
   const [key, setKey] = useState(initialValue);
   const [shouldSave, setShouldSave] = useState(false);
+  
+  // Validation State
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [detectedModel, setDetectedModel] = useState<string | null>(null);
+
+  const handleValidation = async () => {
+    if (!key) return;
+
+    setIsValidating(true);
+    setValidationError(null);
+    setDetectedModel(null);
+
+    try {
+        const modelId = await checkModelAvailability(key);
+        setDetectedModel(modelId);
+        
+        // Slight delay to show the success state before auto-saving/closing
+        setTimeout(() => {
+            onSave(key, shouldSave, modelId);
+        }, 1500);
+
+    } catch (err: any) {
+        setValidationError(err.message || "Failed to validate API Key");
+        setIsValidating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -27,18 +55,31 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                 <Key className="w-5 h-5" />
                 <span>API CONFIGURATION</span>
              </div>
+             {/* Always allow closing, even during validation, to prevent getting stuck */}
              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
              </button>
           </div>
 
-          {isErrorMode && (
+          {isErrorMode && !validationError && (
             <div className="mb-6 bg-red-900/20 border border-red-500/50 p-4 rounded flex gap-3 items-start animate-pulse">
                 <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                 <div>
                     <h4 className="text-red-500 font-bold font-mono text-sm mb-1">CONNECTION FAILURE</h4>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                        The default system uplink is overloaded or unresponsive. To continue the investigation, you must manually override with your own Neural Uplink (API Key).
+                        The default system uplink is overloaded or unresponsive. You must manually override with your own Neural Uplink (API Key).
+                    </p>
+                </div>
+            </div>
+          )}
+
+          {validationError && (
+            <div className="mb-6 bg-red-900/20 border border-red-500/50 p-4 rounded flex gap-3 items-start">
+                <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                    <h4 className="text-red-500 font-bold font-mono text-sm mb-1">VALIDATION FAILED</h4>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                        {validationError}
                     </p>
                 </div>
             </div>
@@ -52,9 +93,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                 <input 
                     type="password" 
                     value={key}
-                    onChange={(e) => setKey(e.target.value)}
+                    onChange={(e) => {
+                        setKey(e.target.value);
+                        setValidationError(null); // Clear error on typing
+                    }}
+                    disabled={isValidating}
                     placeholder="AIzaSy..."
-                    className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green transition-all placeholder-gray-600"
+                    className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green transition-all placeholder-gray-600 disabled:opacity-50"
                 />
             </div>
 
@@ -76,6 +121,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                         id="save-key" 
                         checked={shouldSave}
                         onChange={(e) => setShouldSave(e.target.checked)}
+                        disabled={isValidating}
                         className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 transition-all checked:border-osint-green checked:bg-osint-green hover:border-gray-400"
                     />
                     <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-black opacity-0 peer-checked:opacity-100">
@@ -88,18 +134,41 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
             </div>
 
             <button 
-                onClick={() => onSave(key, shouldSave)}
-                disabled={!key}
+                onClick={handleValidation}
+                disabled={!key || isValidating}
                 className={`
                     w-full font-mono font-bold py-3 rounded transition-all uppercase tracking-widest mt-2 flex items-center justify-center gap-2
-                    ${key 
+                    ${key && !isValidating
                         ? 'bg-osint-green text-black hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.6)]' 
                         : 'bg-gray-800 text-gray-500 cursor-not-allowed'}
                 `}
             >
-                {shouldSave ? <Save className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {key ? 'ESTABLISH UPLINK' : 'ENTER KEY'}
+                {isValidating ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        CHECKING AVAILABILITY...
+                    </>
+                ) : detectedModel ? (
+                    <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        UPLINK SECURE ({detectedModel.replace('gemini-', '')})
+                    </>
+                ) : (
+                    <>
+                         {shouldSave ? <Save className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                         {key ? 'ESTABLISH UPLINK' : 'ENTER KEY'}
+                    </>
+                )}
             </button>
+            
+            {detectedModel && (
+                 <div className="text-center text-[10px] font-mono text-osint-green animate-pulse">
+                    <div className="flex items-center justify-center gap-1">
+                        <Server className="w-3 h-3" />
+                        <span>OPTIMIZED ROUTE: {detectedModel.toUpperCase()}</span>
+                    </div>
+                 </div>
+            )}
           </div>
         </div>
       </div>
