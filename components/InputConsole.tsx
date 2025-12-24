@@ -1,17 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Globe, ShieldAlert, Cpu } from 'lucide-react';
+import { Search, Globe, ShieldAlert, Cpu, ChevronDown, Scan } from 'lucide-react';
 import { TargetType, AppState } from '../types';
 
 interface InputConsoleProps {
-  onStart: (target: string, type: TargetType) => void;
+  onStart: (target: string, type: TargetType, additionalInfo: string) => void;
   appState: AppState;
+  initialInput?: string;
+  initialInfo?: string;
+  autoExpand?: boolean;
 }
 
-export const InputConsole: React.FC<InputConsoleProps> = ({ onStart, appState }) => {
-  const [input, setInput] = useState('');
+export const InputConsole: React.FC<InputConsoleProps> = ({ 
+    onStart, 
+    appState, 
+    initialInput = '', 
+    initialInfo = '',
+    autoExpand = false 
+}) => {
+  const [input, setInput] = useState(initialInput);
+  const [additionalInfo, setAdditionalInfo] = useState(initialInfo);
+  const [isExpanded, setIsExpanded] = useState(autoExpand);
   const [detectedType, setDetectedType] = useState<TargetType>(TargetType.UNKNOWN);
+  const [hasTyped, setHasTyped] = useState(false);
 
   useEffect(() => {
+    setInput(initialInput);
+    if (initialInput) setHasTyped(true);
+  }, [initialInput]);
+
+  useEffect(() => {
+    setAdditionalInfo(initialInfo);
+  }, [initialInfo]);
+
+  useEffect(() => {
+    if (autoExpand) setIsExpanded(true);
+  }, [autoExpand]);
+
+  useEffect(() => {
+    if (input.length > 0) {
+        setHasTyped(true);
+    } else {
+        setHasTyped(false);
+    }
+
     const detect = (val: string) => {
       if (!val) return TargetType.UNKNOWN;
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,74 +61,121 @@ export const InputConsole: React.FC<InputConsoleProps> = ({ onStart, appState })
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input && detectedType !== TargetType.UNKNOWN && !isLocked) {
-      onStart(input, detectedType);
+      onStart(input, detectedType, additionalInfo);
     }
   };
 
-  // Only lock during active processing
   const isLocked = appState === AppState.ANALYZING || appState === AppState.GENERATING;
+  const isIdle = appState === AppState.IDLE;
+
+  // Only scale up on Large screens (Desktop), keep normal on Tablet/Mobile to avoid overflow
+  const idleScaleClass = isIdle ? 'scale-100 lg:scale-105' : 'scale-100';
 
   return (
-    <div className="w-full max-w-4xl mx-auto mb-8">
-      <div className="bg-osint-black border border-osint-green/30 p-1 rounded-lg shadow-[0_0_20px_rgba(0,255,65,0.15)]">
-        <div className="bg-black/90 p-6 rounded relative overflow-hidden">
+    <div className={`w-full max-w-4xl mx-auto transition-all duration-700 ease-in-out ${idleScaleClass}`} id="input-console">
+      <div className={`bg-osint-black border transition-all duration-500 ${hasTyped ? 'border-osint-green/50 shadow-[0_0_30px_rgba(0,255,65,0.15)]' : 'border-gray-800 shadow-none'} p-0.5 md:p-1 rounded-lg`}>
+        <div className="bg-black/90 p-4 md:p-6 lg:p-8 rounded relative overflow-hidden transition-all duration-500">
             {/* Background Grid Decoration */}
-            <div className="absolute inset-0 scan-overlay opacity-30 pointer-events-none"></div>
+            <div className={`absolute inset-0 scan-overlay pointer-events-none transition-opacity duration-1000 ${hasTyped ? 'opacity-30' : 'opacity-10'}`}></div>
 
-            <div className="flex items-center justify-between mb-4 text-xs font-mono text-osint-dim">
+            <div className="flex items-center justify-between mb-6 md:mb-8 text-[10px] md:text-xs font-mono text-osint-dim transition-opacity duration-500">
                 <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    <span>UNIVERSAL OSINT ORCHESTRATOR v3.0</span>
+                    <Globe className="w-3 h-3 md:w-4 md:h-4" />
+                    <span className="tracking-widest hidden sm:inline">UNIVERSAL OSINT ORCHESTRATOR v3.5</span>
+                    <span className="tracking-widest sm:hidden">OSINT ORCHESTRATOR v3.5</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>SECURE CONNECTION: ACTIVE</span>
+                <div className={`flex items-center gap-2 transition-opacity duration-500 ${hasTyped ? 'opacity-100' : 'opacity-0'}`}>
+                    <ShieldAlert className="w-3 h-3 md:w-4 md:h-4" />
+                    <span className="hidden sm:inline">SECURE UPLINK: READY</span>
+                    <span className="sm:hidden">READY</span>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="relative z-10">
-                <div className="flex flex-col md:flex-row gap-4 items-stretch">
-                    <div className="flex-1 relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                             <span className="text-osint-green font-mono text-lg">{'>'}</span>
+                <div className="flex flex-col gap-4 md:gap-6">
+                    {/* Main Input Area */}
+                    <div className="relative group">
+                        <div className={`absolute top-1/2 -translate-y-1/2 left-3 md:left-4 transition-all duration-500 ${hasTyped ? 'text-osint-green scale-100' : 'text-gray-600 scale-90'}`}>
+                            {hasTyped ? <span className="font-mono text-lg md:text-xl">{'>'}</span> : <Scan className="w-4 h-4 md:w-5 md:h-5" />}
                         </div>
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             disabled={isLocked}
-                            className="w-full bg-gray-900/50 border border-gray-700 text-gray-100 font-mono text-lg rounded py-3 pl-10 pr-4 focus:outline-none focus:border-osint-green focus:ring-1 focus:ring-osint-green transition-all placeholder-gray-600 uppercase tracking-wider"
-                            placeholder="ENTER TARGET (PHONE, EMAIL, USERNAME, NAME)"
+                            className={`
+                                w-full bg-gray-900/30 border text-gray-100 font-mono text-base md:text-lg lg:text-xl rounded py-3 md:py-4 pl-10 md:pl-12 pr-20 md:pr-32 
+                                focus:outline-none focus:ring-1 transition-all duration-500
+                                ${hasTyped ? 'border-gray-700 focus:border-osint-green focus:ring-osint-green' : 'border-transparent focus:border-gray-700 focus:ring-gray-700'}
+                                placeholder-gray-700 uppercase tracking-wider
+                            `}
+                            placeholder="ENTER TARGET..."
                             spellCheck={false}
                         />
+                        
+                        {/* Detected Type Tag - Animates In */}
+                        <div className={`
+                            absolute top-1/2 -translate-y-1/2 right-2 md:right-4 pointer-events-none
+                            transition-all duration-700 ease-out
+                            ${hasTyped && detectedType !== TargetType.UNKNOWN ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}
+                        `}>
+                             <span className="px-2 py-0.5 md:px-3 md:py-1 rounded bg-osint-dim/20 text-osint-green border border-osint-dim text-[10px] md:text-xs font-mono tracking-widest shadow-[0_0_10px_rgba(0,255,65,0.2)]">
+                                {detectedType}
+                            </span>
+                        </div>
                     </div>
-                    
-                    <button
-                        type="submit"
-                        disabled={isLocked || detectedType === TargetType.UNKNOWN}
-                        className={`
-                            px-8 py-3 rounded font-mono font-bold tracking-widest transition-all flex items-center justify-center gap-2
-                            ${isLocked || detectedType === TargetType.UNKNOWN
-                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
-                                : 'bg-osint-green text-black hover:bg-white hover:shadow-[0_0_15px_rgba(0,255,65,0.8)]'}
-                        `}
-                    >
-                        {isLocked ? <Cpu className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                        {isLocked ? 'EXECUTING' : 'INITIALIZE'}
-                    </button>
+
+                    {/* Controls & Context - Collapsible */}
+                    <div className={`
+                        grid transition-all duration-700 ease-in-out overflow-hidden will-change-transform
+                        ${hasTyped ? 'grid-rows-[1fr] opacity-100 mt-0 md:mt-2' : 'grid-rows-[0fr] opacity-0 mt-0'}
+                    `}>
+                        <div className="min-h-0 flex flex-col gap-4">
+                            
+                            {/* Context Parameters */}
+                            <div className="border-t border-gray-800/50 pt-3 md:pt-4 animate-in fade-in slide-in-from-top-4 duration-700 delay-100 fill-mode-backwards">
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsExpanded(!isExpanded)}
+                                    className="flex items-center gap-2 text-[10px] md:text-xs font-mono text-gray-500 hover:text-osint-green transition-colors mb-2 group w-full md:w-auto"
+                                >
+                                    <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                                        <ChevronDown className="w-3 h-3" />
+                                    </div>
+                                    <span className="group-hover:tracking-widest transition-all duration-300">CONTEXT PARAMETERS (OPTIONAL)</span>
+                                </button>
+                                
+                                <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isExpanded ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                    <textarea
+                                        value={additionalInfo}
+                                        onChange={(e) => setAdditionalInfo(e.target.value)}
+                                        disabled={isLocked}
+                                        placeholder="PROVIDE ADDITIONAL CONTEXT (e.g. 'Software Engineer in London')..."
+                                        className="w-full bg-gray-900/30 border border-gray-800 text-gray-300 font-mono text-xs md:text-sm rounded p-3 focus:outline-none focus:border-osint-green/50 focus:ring-1 focus:ring-osint-green/50 transition-all h-20 md:h-24 resize-none placeholder-gray-600 backdrop-blur-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button
+                                    type="submit"
+                                    disabled={isLocked || detectedType === TargetType.UNKNOWN}
+                                    className={`
+                                        w-full md:w-auto px-6 md:px-10 py-3 rounded font-mono font-bold tracking-[0.2em] transition-all duration-300 flex items-center justify-center gap-3 uppercase text-xs md:text-base
+                                        ${isLocked || detectedType === TargetType.UNKNOWN
+                                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed' 
+                                            : 'bg-osint-green text-black hover:bg-white hover:shadow-[0_0_20px_rgba(0,255,65,0.6)] transform hover:-translate-y-1'}
+                                    `}
+                                >
+                                    {isLocked ? <Cpu className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <Search className="w-4 h-4 md:w-5 md:h-5" />}
+                                    {isLocked ? 'EXECUTING' : 'INITIALIZE SCAN'}
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
             </form>
-
-            <div className="mt-4 flex items-center gap-4 text-xs font-mono h-6">
-                <span className="text-gray-500">DETECTED SELECTOR:</span>
-                <span className={`px-2 py-0.5 rounded ${detectedType !== TargetType.UNKNOWN ? 'bg-osint-dim/20 text-osint-green border border-osint-dim' : 'text-gray-600'}`}>
-                    {detectedType}
-                </span>
-                
-                {detectedType === TargetType.PHONE && <span className="text-cyan-600 ml-auto">MODULES: PhoneInfoga, HLR Lookup</span>}
-                {detectedType === TargetType.EMAIL && <span className="text-cyan-600 ml-auto">MODULES: HIBP, Holehe, Hunter</span>}
-                {detectedType === TargetType.USERNAME && <span className="text-cyan-600 ml-auto">MODULES: Maigret, Sherlock</span>}
-            </div>
         </div>
       </div>
     </div>

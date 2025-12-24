@@ -22,11 +22,30 @@
             animation: {
               'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               'scan-line': 'scan 2s linear infinite',
+              'blur-in': 'blurIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'flicker': 'flicker 0.15s infinite',
+              'progress-scale': 'progressScale 60s linear forwards',
             },
             keyframes: {
               scan: {
                 '0%': { transform: 'translateY(-100%)' },
                 '100%': { transform: 'translateY(100%)' }
+              },
+              blurIn: {
+                '0%': { opacity: '0', filter: 'blur(10px)', transform: 'scale(0.98)' },
+                '100%': { opacity: '1', filter: 'blur(0)', transform: 'scale(1)' }
+              },
+              flicker: {
+                 '0%': { opacity: '0.9' },
+                 '50%': { opacity: '1' },
+                 '100%': { opacity: '0.9' }
+              },
+              progressScale: {
+                '0%': { transform: 'scaleX(0)' },
+                '20%': { transform: 'scaleX(0.3)' },
+                '50%': { transform: 'scaleX(0.6)' },
+                '80%': { transform: 'scaleX(0.85)' },
+                '100%': { transform: 'scaleX(0.98)' }
               }
             }
           }
@@ -37,6 +56,8 @@
       body {
         background-color: #050505;
         color: #e0e0e0;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
       }
       .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -48,6 +69,13 @@
       .scan-overlay {
         background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 65, 0.05) 51%);
         background-size: 100% 4px;
+        pointer-events: none;
+      }
+      /* GPU Acceleration Helpers */
+      .gpu-accelerated {
+        transform: translateZ(0);
+        will-change: transform, opacity;
+        backface-visibility: hidden;
       }
     </style>
   <script type="importmap">

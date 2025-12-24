@@ -1,62 +1,88 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { TargetType, OsintResult } from "../types";
+import { GoogleGenAI } from "@google/genai";
+import { TargetType } from "../types";
 
 const SYSTEM_PROMPT = `
-ROLE: You are the Universal OSINT Orchestrator, a real-time intelligence gathering interface.
-Your goal is to perform an INITIAL RECONNAISSANCE scan on the target using Google Search.
+ROLE: You are the Universal OSINT Orchestrator.
+GOAL: Perform a FORENSIC-LEVEL SCRAPE. 
 
 CORE DIRECTIVES:
-1. **REAL DATA ONLY**: Do NOT generate fake, simulated, or dummy data. Use the Google Search tool to find *actual* public footprints (social media, news, registries).
-2. **HONESTY**: If Google Search returns no relevant results for the specific target, explicitly state: "No publicly available intelligence found for this selector."
-3. **REPORTING**: Synthesize found data into a clean, professional Markdown dossier. Cite sources/URLs where possible.
+1. **ZERO TRUNCATION**: You are prohibited from summarizing. If you find a list of 50 items, LIST ALL 50.
+2. **VERBOSITY**: Prefer long, detailed reports over concise ones. 
+3. **REAL DATA ONLY**: Do NOT generate fake data.
+4. **SCOPE**:
+   - **Education/Work**: Extract specific dates, GPA, project names, and thesis titles.
+   - **Development**: Extract repository names, commit history summaries, and languages used.
+   - **Social**: Extract bio text exactly as written.
 
 TASK:
-The user will provide a target. You must:
-1. Search Google for the target to find real-world traces.
-2. Compile the "reportMarkdown" based EXCLUSIVELY on search results or general knowledge (e.g., if it's a known entity).
+1. Search Google for the target using the context.
+2. If multiple potential matches are found, list the top 3 most likely candidates with reasoning.
+3. STREAM the output as a detailed Markdown dossier.
 
-OUTPUT FORMAT:
-Return a JSON object with one field:
-- "reportMarkdown": The intelligence dossier (Markdown format).
+OUTPUT RULES:
+- **Do not** use phrases like "various projects" or "and others". List them.
+- **Do not** cut off long text. 
+- **Do not** omit dates or locations.
+- **IMPORTANT**: Do NOT wrap the output in a markdown code block (e.g., \`\`\`markdown). Return RAW markdown text only.
 `;
 
-export const generateOsintData = async (target: string, type: TargetType): Promise<OsintResult> => {
+export const streamOsintData = async (
+    target: string, 
+    type: TargetType, 
+    additionalInfo: string, 
+    onUpdate: (chunk: string) => void,
+    customApiKey?: string
+): Promise<void> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = customApiKey || process.env.API_KEY;
     
+    if (!apiKey) {
+        throw new Error("No API Configuration Found. Please set a Custom API Key.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const timestamp = new Date().toISOString();
+    
+    let contextPrompt = "";
+    if (additionalInfo) {
+        contextPrompt = `\nADDITIONAL CONTEXT PROVIDED BY INTELLIGENCE OFFICER:\n"${additionalInfo}"\nUse this context to filter false positives and find the correct individual.\n`;
+    }
+
     const prompt = `
       TARGET: "${target}"
       DETECTED TYPE: ${type}
+      TIMESTAMP: ${timestamp}
+      ${contextPrompt}
       
-      Conduct real-time OSINT reconnaissance and generate the report.
+      Conduct a deep, multi-pass OSINT reconnaissance. 
+      **Search specifically for resumes, CVs, portfolios, and academic records.**
+      
+      CRITICAL INSTRUCTION:
+      Provide the MOST DETAILED report possible. 
+      If you find a GitHub profile, list the top repositories. 
+      If you find a LinkedIn, list the full work history with dates.
+      DO NOT TRIM THE OUTPUT.
+      
+      Begin streaming the Markdown report immediately.
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+    // Switch to gemini-3-pro-preview for maximum reasoning capability and detail
+    const responseStream = await ai.models.generateContentStream({
+      model: 'gemini-3-pro-preview', 
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_PROMPT,
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            reportMarkdown: { type: Type.STRING }
-          },
-          required: ["reportMarkdown"]
-        }
+        temperature: 0, 
       }
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("No response from AI");
+    for await (const chunk of responseStream) {
+        const text = chunk.text;
+        if (text) {
+            onUpdate(text);
+        }
     }
-
-    const data = JSON.parse(text);
-    return {
-      reportMarkdown: data.reportMarkdown
-    };
 
   } catch (error) {
     console.error("Gemini API Error:", error);
