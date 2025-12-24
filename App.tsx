@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { TargetType, AppState, LogEntry, OsintResult } from './types';
 import { InputConsole } from './components/InputConsole';
 import { TerminalLog } from './components/TerminalLog';
@@ -7,6 +7,8 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { DisclaimerOverlay } from './components/DisclaimerOverlay';
 import { streamOsintData } from './services/geminiService';
 import { Shield, Activity, Database, Key, AlertTriangle } from 'lucide-react';
+
+const STORAGE_KEY = 'osint_gemini_api_key';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -29,6 +31,17 @@ const App: React.FC = () => {
 
   // Refs for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Initialize: Check for stored API Key
+  useEffect(() => {
+    const storedKey = localStorage.getItem(STORAGE_KEY);
+    if (storedKey) {
+        setCustomApiKey(storedKey);
+    } else {
+        // If no key is saved, prompt the user immediately
+        setIsKeyModalOpen(true);
+    }
+  }, []);
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     const newLog: LogEntry = {
@@ -72,6 +85,11 @@ const App: React.FC = () => {
     abortControllerRef.current = new AbortController();
 
     try {
+        // Check if we have a key before starting visual sequence
+        if (!customApiKey && !process.env.API_KEY) {
+            throw new Error("Missing API Key");
+        }
+
         // Start the visual log sequence (Runs in background)
         const logPromise = runRealisticSequence();
 
@@ -106,12 +124,16 @@ const App: React.FC = () => {
 
     } catch (error) {
         console.error(error);
+        const errMsg = error instanceof Error ? error.message : 'Unknown error';
+        
         addLog('API REQUEST FAILED.', 'error');
-        addLog(error instanceof Error ? error.message : 'Unknown error', 'error');
+        addLog(errMsg, 'error');
         setAppState(AppState.ERROR);
         
-        setIsErrorMode(true);
-        setIsKeyModalOpen(true);
+        if (errMsg.includes("API Key") || errMsg.includes("Key")) {
+             setIsErrorMode(true);
+             setIsKeyModalOpen(true);
+        }
     }
   };
 
@@ -153,13 +175,19 @@ const App: React.FC = () => {
     // The loop ends, usually the stream starts right after this.
   };
 
-  const handleSaveKey = (key: string) => {
+  const handleSaveKey = (key: string, shouldSave: boolean) => {
     setCustomApiKey(key);
+    
+    if (shouldSave && key) {
+        localStorage.setItem(STORAGE_KEY, key);
+        addLog('Secure Uplink Established. Key Saved to Local Storage.', 'success');
+    } else {
+        localStorage.removeItem(STORAGE_KEY);
+        if (key) addLog('Secure Uplink Established (Session Only).', 'success');
+    }
+
     setIsKeyModalOpen(false);
     setIsErrorMode(false);
-    if (key) {
-        addLog('Custom API Key updated.', 'success');
-    }
   };
 
   const handleRetry = () => {
