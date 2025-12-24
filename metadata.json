@@ -1,0 +1,5 @@
+{
+  "name": "Universal OSINT Orchestrator",
+  "description": "An advanced intelligence system interface that simulates digital identity investigation workflows and generates Python automation code for OSINT tasks.",
+  "requestFramePermissions": []
+}
