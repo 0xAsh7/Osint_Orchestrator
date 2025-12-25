@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Key, X, ExternalLink, ShieldAlert, Save, Loader2, CheckCircle2, Server, ChevronDown } from 'lucide-react';
-import { checkModelAvailability, FREE_MODELS } from '../services/geminiService';
+import { Key, X, ExternalLink, ShieldAlert, Save, Loader2, CheckCircle2, ChevronDown } from 'lucide-react';
+import { checkModelAvailability, GOOGLE_MODELS } from '../services/geminiService';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -13,14 +13,14 @@ interface ApiKeyModalProps {
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, initialValue = '', isErrorMode = false }) => {
   const [key, setKey] = useState(initialValue);
   const [shouldSave, setShouldSave] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(FREE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState(GOOGLE_MODELS[0].id);
   
   // Validation State
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
 
-  // Effect to reset internal state when modal re-opens (sanity check, though unmount usually handles this)
+  // Effect to reset internal state when modal re-opens
   useEffect(() => {
     if (isOpen) {
         setValidationError(null);
@@ -37,7 +37,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
 
     try {
         // Prefer input key, otherwise fallback will be handled by service
-        // We assume env vars are present if input is empty
         const keyToTest = key || process.env.API_KEY || "";
         
         await checkModelAvailability(keyToTest, selectedModel);
@@ -45,7 +44,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
         
         // Slight delay to show the success state before auto-saving/closing
         setTimeout(() => {
-            setIsValidating(false); // Explicitly clear loading state
+            setIsValidating(false);
             onSave(key, shouldSave, selectedModel);
         }, 1500);
 
@@ -67,7 +66,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
           <div className="flex items-center justify-between mb-6">
              <div className="flex items-center gap-2 text-osint-green font-mono font-bold text-lg">
                 <Key className="w-5 h-5" />
-                <span>OPENROUTER CONFIG</span>
+                <span>GOOGLE API CONFIG</span>
              </div>
              <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
@@ -80,7 +79,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                 <div>
                     <h4 className="text-red-500 font-bold font-mono text-sm mb-1">CONNECTION FAILURE</h4>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                        The current uplink is unresponsive. Please verify your OpenRouter Key or select a different model.
+                        The current uplink is unresponsive. Please verify your Gemini API Key or select a different model.
                     </p>
                 </div>
             </div>
@@ -102,7 +101,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
              {/* Model Selection */}
             <div>
                 <label className="block text-xs font-mono text-osint-dim mb-2 uppercase tracking-wider">
-                    Target Model (Free Tier)
+                    Target Model
                 </label>
                 <div className="relative">
                     <select 
@@ -110,7 +109,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                         onChange={(e) => setSelectedModel(e.target.value)}
                         className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-xs md:text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green appearance-none cursor-pointer"
                     >
-                        {FREE_MODELS.map(model => (
+                        {GOOGLE_MODELS.map(model => (
                             <option key={model.id} value={model.id}>
                                 {model.name}
                             </option>
@@ -123,7 +122,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
             {/* API Key Input */}
             <div>
                 <label className="block text-xs font-mono text-osint-dim mb-2 uppercase tracking-wider flex justify-between">
-                    <span>OpenRouter API Key</span>
+                    <span>Gemini API Key</span>
                     <span className="text-gray-500 text-[10px]">Leave empty to use default</span>
                 </label>
                 <input 
@@ -134,7 +133,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
                         setValidationError(null); 
                     }}
                     disabled={isValidating}
-                    placeholder="sk-or-..."
+                    placeholder="AIzaSy..."
                     className="w-full bg-gray-900 border border-gray-700 rounded p-3 text-white font-mono text-sm focus:border-osint-green focus:outline-none focus:ring-1 focus:ring-osint-green transition-all placeholder-gray-600 disabled:opacity-50"
                 />
             </div>
@@ -142,8 +141,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSav
             <div className="bg-gray-900/50 rounded p-4 border border-gray-800">
                 <h4 className="text-gray-300 font-mono text-xs font-bold mb-2">HOW TO GET A KEY:</h4>
                 <ol className="text-gray-500 text-xs space-y-2 list-decimal list-inside font-mono">
-                    <li>Go to <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-osint-dim hover:text-osint-green underline inline-flex items-center gap-1">OpenRouter.ai <ExternalLink className="w-3 h-3"/></a>.</li>
-                    <li>Create a key (no credit card required for free models).</li>
+                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-osint-dim hover:text-osint-green underline inline-flex items-center gap-1">Google AI Studio <ExternalLink className="w-3 h-3"/></a>.</li>
+                    <li>Create a new API key.</li>
                     <li>Paste the key above.</li>
                 </ol>
             </div>

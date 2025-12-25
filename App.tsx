@@ -5,11 +5,11 @@ import { TerminalLog } from './components/TerminalLog';
 import { ResultViewer } from './components/ResultViewer';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { DisclaimerOverlay } from './components/DisclaimerOverlay';
-import { streamOsintData, FREE_MODELS } from './services/geminiService';
+import { streamOsintData, GOOGLE_MODELS } from './services/geminiService';
 import { Shield, Activity, Database, Key, AlertTriangle, Cpu } from 'lucide-react';
 
-const STORAGE_KEY = 'osint_openrouter_api_key';
-const STORAGE_MODEL_KEY = 'osint_openrouter_model_id';
+const STORAGE_KEY = 'osint_google_api_key';
+const STORAGE_MODEL_KEY = 'osint_google_model_id';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -27,7 +27,7 @@ const App: React.FC = () => {
 
   // API Key & Model Management
   const [customApiKey, setCustomApiKey] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>(FREE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState<string>(GOOGLE_MODELS[0].id);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isErrorMode, setIsErrorMode] = useState(false);
 
@@ -48,6 +48,9 @@ const App: React.FC = () => {
     
     if (storedModel) {
         setSelectedModel(storedModel);
+    } else {
+        // Ensure we default to the first model in the list (Pro Exp) if no storage
+        setSelectedModel(GOOGLE_MODELS[0].id);
     }
 
     // Only open modal automatically if we have NO key source at all
@@ -137,7 +140,7 @@ const App: React.FC = () => {
         addLog(errMsg, 'error');
         setAppState(AppState.ERROR);
         
-        if (errMsg.includes("Key") || errMsg.includes("Auth") || errMsg.includes("401")) {
+        if (errMsg.includes("Key") || errMsg.includes("Auth") || errMsg.includes("401") || errMsg.includes("403")) {
              setIsErrorMode(true);
              setIsKeyModalOpen(true);
         }
@@ -147,21 +150,20 @@ const App: React.FC = () => {
   const runRealisticSequence = async () => {
     const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
     
-    addLog(`Initializing OpenRouter client...`, 'system');
+    addLog(`Initializing Gemini client...`, 'system');
     await delay(500);
     
     addLog(`Target: "${lastTarget}" (${lastType})`, 'info');
     if (lastInfo) addLog(`Injecting context parameters...`, 'info');
     
     await delay(1000);
-    const modelName = FREE_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown Model';
+    const modelName = GOOGLE_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown Model';
     addLog(`Constructing prompt for '${modelName}'...`, 'system');
     await delay(1000);
     
-    addLog(`Dispatching payload to OpenRouter Neural Network...`, 'warning');
+    addLog(`Dispatching payload to Google Neural Network...`, 'warning');
     await delay(1000); 
 
-    // OpenRouter is usually faster than Gemini with tools, but we keep some suspense
     addLog(`Resolving model node routing...`, 'info');
     await delay(1000); 
     
@@ -235,12 +237,12 @@ const App: React.FC = () => {
                 {/* Detected Model Indicator */}
                 <div className="hidden lg:flex items-center gap-2">
                     <Cpu className="w-3 h-3 text-osint-dim" />
-                    <span className="truncate max-w-[150px]">MODEL: <span className="text-gray-300">{selectedModel.split('/')[1] || selectedModel}</span></span>
+                    <span className="truncate max-w-[150px]">MODEL: <span className="text-gray-300">{selectedModel.replace('gemini-', '')}</span></span>
                 </div>
 
                 <div className="hidden lg:flex items-center gap-2">
                     <Database className="w-3 h-3" />
-                    <span>OPENROUTER</span>
+                    <span>GOOGLE GENAI</span>
                 </div>
                 <button 
                     onClick={() => { setIsErrorMode(false); setIsKeyModalOpen(true); }}

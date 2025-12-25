@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { OsintResult } from '../types';
 import ReactMarkdown from 'react-markdown';
-import { FileText, Copy, Check, RefreshCw, Edit, Server } from 'lucide-react';
+import { FileText, Copy, Check, RefreshCw, Edit, Server, Download, Loader2 } from 'lucide-react';
 
 interface ResultViewerProps {
   result: OsintResult;
@@ -12,7 +12,9 @@ interface ResultViewerProps {
 
 export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onRefine, isStreaming }) => {
   const [copied, setCopied] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isStreaming && bottomRef.current) {
@@ -24,6 +26,41 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
     navigator.clipboard.writeText(result.reportMarkdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!contentRef.current || isExporting) return;
+    setIsExporting(true);
+
+    const element = contentRef.current;
+    // @ts-ignore
+    const html2pdf = window.html2pdf;
+
+    if (!html2pdf) {
+        console.error("html2pdf library not loaded");
+        setIsExporting(false);
+        return;
+    }
+
+    const opt = {
+        margin: [10, 10], // mm
+        filename: `osint_dossier_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true, 
+            backgroundColor: '#050505', // Preserve dark theme
+            logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        setIsExporting(false);
+    }).catch((err: any) => {
+        console.error("PDF Export failed", err);
+        setIsExporting(false);
+    });
   };
 
   // Cleaning function to strip code blocks if the model hallucinates them
@@ -74,6 +111,18 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
                         <span className="hidden sm:inline">REFINE</span>
                     </button>
                     <div className="h-4 w-[1px] bg-gray-800 mx-1"></div>
+                    
+                    <button 
+                        onClick={handleDownloadPdf}
+                        disabled={isExporting}
+                        className="flex items-center gap-1 text-[10px] md:text-xs font-mono text-osint-green hover:text-white transition-colors uppercase border border-osint-green/30 hover:border-osint-green px-2 py-1 rounded bg-osint-green/10 hover:bg-osint-green/20"
+                        title="Download PDF"
+                    >
+                        {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                        <span className="hidden sm:inline">PDF</span>
+                    </button>
+                    
+                    <div className="h-4 w-[1px] bg-gray-800 mx-1"></div>
                 </>
             )}
 
@@ -113,7 +162,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
                     </div>
                  </div>
             ) : (
-                <div className="prose prose-invert prose-xs md:prose-sm max-w-none font-mono min-h-full animate-blur-in">
+                <div ref={contentRef} className="prose prose-invert prose-xs md:prose-sm max-w-none font-mono min-h-full animate-blur-in p-2">
                     {/* Custom Styling via Tailwind Typography classes */}
                     <style>{`
                         .prose h1, .prose h2, .prose h3 { color: #00ff41; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #003300; padding-bottom: 0.5rem; }
@@ -124,6 +173,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
                         .prose blockquote { border-left-color: #00ff41; background: #001100; font-style: normal; padding: 0.5rem 1rem; }
                         .prose code { color: #00ff41; background: #002200; padding: 0.1em 0.3em; border-radius: 2px; }
                         .prose p { margin-bottom: 0.75rem; color: #a0a0a0; }
+                        .prose hr { border-color: #003300; border-top-width: 1px; border-style: dashed; margin-top: 2rem; margin-bottom: 2rem; opacity: 0.5; }
                     `}</style>
                     <div className="mb-4 md:mb-6 pb-2 border-b border-osint-green/20 flex flex-col md:flex-row md:justify-between md:items-end gap-1">
                         <span className="text-osint-dim text-[10px] md:text-xs">CLASSIFICATION: UNRESTRICTED // OPEN SOURCE</span>
