@@ -54,19 +54,14 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
             min-height: 100vh;
             background-color: #0a0a0a;
             z-index: 9998; /* Just below the loader */
-            padding: 40px;
-            box-sizing: border-box;
-            color: #e0e0e0;
-            font-family: monospace;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
         `;
 
         // 3. Inject content with specific PDF-friendly styles
-        // Added background-color explicitly to the root PDF element to ensure no white gaps
+        // Set width to 210mm (A4) and padding to 20mm to simulate margins INSIDE the black canvas
         container.innerHTML = `
-            <div id="pdf-content-root" style="width: 100%; max-width: 800px; background-color: #0a0a0a; padding: 20px; color: #e0e0e0;">
+            <div id="pdf-content-root" style="width: 210mm; min-height: 297mm; background-color: #0a0a0a; padding: 20mm; color: #e0e0e0; box-sizing: border-box;">
                 <div style="border-bottom: 2px solid #00ff41; padding-bottom: 20px; margin-bottom: 30px;">
                     <h1 style="color: #00ff41 !important; font-size: 24px; margin: 0; font-family: 'Courier New', Courier, monospace; text-transform: uppercase;">OSINT DOSSIER</h1>
                     <p style="color: #008F11 !important; font-size: 12px; margin: 5px 0 0 0; font-family: 'Courier New', Courier, monospace;">CONFIDENTIAL // ${new Date().toISOString().split('T')[0]}</p>
@@ -83,6 +78,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
                     font-family: 'Courier New', Courier, monospace !important;
                     background-color: #0a0a0a !important;
                     -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
                 }
 
                 .pdf-body {
@@ -168,13 +164,13 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ result, onRetry, onR
 
         // 5. Generate PDF
         const opt = {
-            margin: [10, 10, 10, 10], // mm
+            margin: 0, // Set margin to 0 to eliminate white borders
             filename: `OSINT_REPORT_${Date.now()}.pdf`,
             image: { type: 'jpeg', quality: 1.0 },
             html2canvas: { 
                 scale: 2, 
                 useCORS: true, 
-                backgroundColor: '#0a0a0a', // Vital: Force canvas background to dark
+                backgroundColor: '#0a0a0a', 
                 windowWidth: 1024,
                 scrollY: 0
             },
