@@ -70,6 +70,15 @@ const App: React.FC = () => {
   }, []);
 
   const handleStart = (target: string, type: TargetType, additionalInfo: string) => {
+    if (!customApiKey && !process.env.API_KEY) {
+      setLogs([]);
+      addLog('ERROR: Google Gemini Pro API key is required to run this search. Please provide a valid API key.', 'error');
+      setAppState(AppState.ERROR);
+      setIsErrorMode(true);
+      setIsKeyModalOpen(true);
+      return;
+    }
+
     // 1. Set Initial Data
     setLastTarget(target);
     setLastType(type);
