@@ -278,8 +278,8 @@ const App: React.FC = () => {
             flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 min-h-[500px] transition-all duration-1000 delay-300 gpu-accelerated
             ${appState === AppState.IDLE ? 'opacity-0 translate-y-20 h-0 hidden' : 'opacity-100 translate-y-0 h-auto animate-blur-in'}
         `}>
-            {/* Left: Live Terminal Log */}
-            <div className="lg:col-span-1 h-48 lg:h-full flex flex-col order-2 lg:order-1">
+            {/* Left: Live Terminal Log (HIDDEN TEMPORARILY) */}
+            <div className="hidden lg:col-span-1 h-48 lg:h-full flex flex-col order-2 lg:order-1">
                 <div className="mb-2 flex items-center justify-between text-[10px] md:text-xs font-mono text-gray-500 uppercase tracking-widest">
                     <span>Execution Log</span>
                     <span className="text-osint-dim">Live Feed</span>
@@ -287,8 +287,8 @@ const App: React.FC = () => {
                 <TerminalLog logs={logs} />
             </div>
 
-            {/* Right: Results / Visualization */}
-            <div className="lg:col-span-2 h-[60vh] lg:h-full flex flex-col relative order-1 lg:order-2">
+            {/* Right: Results / Visualization - Now Full Width */}
+            <div className="lg:col-span-3 h-[60vh] lg:h-full flex flex-col relative order-1 lg:order-2">
                 <div className="mb-2 flex items-center justify-between text-[10px] md:text-xs font-mono text-gray-500 uppercase tracking-widest">
                     <span>Intelligence Output</span>
                     {appState === AppState.COMPLETE && <span className="text-osint-green">Active</span>}

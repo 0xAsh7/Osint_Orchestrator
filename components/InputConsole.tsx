@@ -68,11 +68,15 @@ export const InputConsole: React.FC<InputConsoleProps> = ({
   const isLocked = appState === AppState.ANALYZING || appState === AppState.GENERATING;
   const isIdle = appState === AppState.IDLE;
 
-  // Only scale up on Large screens (Desktop), keep normal on Tablet/Mobile to avoid overflow
-  const idleScaleClass = isIdle ? 'scale-100 lg:scale-105' : 'scale-100';
+  // Dynamic Layout Classes
+  // IDLE: Centered, max-w-4xl, scaled up slightly on desktop
+  // ACTIVE: Full width, no scale, matching the workspace width below
+  const containerClasses = isIdle 
+    ? 'max-w-4xl scale-100 lg:scale-105' 
+    : 'max-w-full scale-100';
 
   return (
-    <div className={`w-full max-w-4xl mx-auto transition-all duration-700 ease-in-out ${idleScaleClass}`} id="input-console">
+    <div className={`w-full mx-auto transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] ${containerClasses}`} id="input-console">
       <div className={`bg-osint-black border transition-all duration-500 ${hasTyped ? 'border-osint-green/50 shadow-[0_0_30px_rgba(0,255,65,0.15)]' : 'border-gray-800 shadow-none'} p-0.5 md:p-1 rounded-lg`}>
         <div className="bg-black/90 p-4 md:p-6 lg:p-8 rounded relative overflow-hidden transition-all duration-500">
             {/* Background Grid Decoration */}

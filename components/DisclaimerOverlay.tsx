@@ -7,17 +7,17 @@ interface DisclaimerOverlayProps {
 
 export const DisclaimerOverlay: React.FC<DisclaimerOverlayProps> = ({ onAcknowledge }) => {
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm animate-blur-in">
+    <div className="absolute inset-0 z-50 flex flex-col bg-osint-black/95 backdrop-blur-md animate-blur-in border border-osint-green/30 rounded-lg">
         {/* Header - Compact */}
-        <div className="py-3 px-4 border-b border-osint-green/20 bg-black/60 text-center shrink-0">
+        <div className="py-3 px-4 border-b border-osint-green/20 bg-black/40 text-center shrink-0">
             <h3 className="text-osint-green font-mono text-[9px] md:text-[10px] uppercase tracking-[0.2em] animate-pulse">Compliance Check</h3>
             <h2 className="text-base md:text-lg font-bold text-white font-mono tracking-tighter">OPERATIONAL PROTOCOLS</h2>
         </div>
 
-        {/* Content - Flex Column to distribute space evenly without scrolling */}
-        <div className="flex-1 flex flex-col justify-center p-3 md:p-6 gap-2 md:gap-4 overflow-hidden">
+        {/* Content - Centered and Constrained */}
+        <div className="flex-1 flex flex-col justify-center p-3 md:p-6 gap-2 md:gap-4 overflow-hidden w-full max-w-3xl mx-auto">
              {/* Point 1 */}
-            <div className="flex gap-3 items-start group/item">
+            <div className="flex gap-3 items-start group/item p-2 hover:bg-white/5 rounded transition-colors">
                 <div className="mt-0.5 text-osint-green shrink-0">
                     <Scale className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
@@ -30,7 +30,7 @@ export const DisclaimerOverlay: React.FC<DisclaimerOverlayProps> = ({ onAcknowle
             </div>
 
              {/* Point 2 */}
-            <div className="flex gap-3 items-start group/item">
+            <div className="flex gap-3 items-start group/item p-2 hover:bg-white/5 rounded transition-colors">
                 <div className="mt-0.5 text-yellow-500 shrink-0">
                     <FileWarning className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
@@ -43,7 +43,7 @@ export const DisclaimerOverlay: React.FC<DisclaimerOverlayProps> = ({ onAcknowle
             </div>
 
             {/* Point 3 */}
-            <div className="flex gap-3 items-start group/item">
+            <div className="flex gap-3 items-start group/item p-2 hover:bg-white/5 rounded transition-colors">
                 <div className="mt-0.5 text-blue-400 shrink-0">
                     <Eye className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
@@ -56,7 +56,7 @@ export const DisclaimerOverlay: React.FC<DisclaimerOverlayProps> = ({ onAcknowle
             </div>
 
             {/* Point 4 */}
-            <div className="flex gap-3 items-start group/item">
+            <div className="flex gap-3 items-start group/item p-2 hover:bg-white/5 rounded transition-colors">
                 <div className="mt-0.5 text-osint-alert shrink-0">
                     <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
@@ -70,10 +70,10 @@ export const DisclaimerOverlay: React.FC<DisclaimerOverlayProps> = ({ onAcknowle
         </div>
 
         {/* Footer - Compact */}
-        <div className="p-3 md:p-4 border-t border-osint-green/20 bg-black/60 shrink-0 pb-safe">
+        <div className="p-3 md:p-4 border-t border-osint-green/20 bg-black/40 shrink-0 pb-safe">
             <button 
                 onClick={onAcknowledge}
-                className="w-full bg-white text-black font-mono font-bold py-2.5 md:py-3 rounded hover:bg-osint-green hover:shadow-[0_0_15px_rgba(0,255,65,0.4)] transition-all uppercase tracking-widest flex items-center justify-center gap-2 text-[10px] md:text-xs group"
+                className="w-full max-w-xl mx-auto bg-white text-black font-mono font-bold py-2.5 md:py-3 rounded hover:bg-osint-green hover:shadow-[0_0_15px_rgba(0,255,65,0.4)] transition-all uppercase tracking-widest flex items-center justify-center gap-2 text-[10px] md:text-xs group"
             >
                 <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 <span>I ACKNOWLEDGE THE RISKS</span>
